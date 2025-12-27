@@ -1,0 +1,233 @@
+{% extends "base.html" %}
+
+{% block title %}Результат обработки - Image Cross Processor{% endblock %}
+
+{% block extra_css %}
+<style>
+.chart-container {
+    position: relative;
+    height: 300px;
+    width: 100%;
+    margin-bottom: 20px;
+}
+.image-container {
+    text-align: center;
+    margin-bottom: 30px;
+}
+.image-container img {
+    max-width: 100%;
+    border-radius: 10px;
+    box-shadow: 0 5px 15px rgba(0,0,0,0.1);
+}
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="row">
+    <div class="col-12">
+        <div class="card shadow mb-4">
+            <div class="card-header bg-success text-white">
+                <h3 class="mb-0">
+                    <i class="fas fa-chart-bar"></i> Результат обработки с гистограммами
+                </h3>
+            </div>
+            <div class="card-body">
+                
+                <!-- Контейнеры для результатов -->
+                <div id="resultContainer" style="display: none;">
+                    <!-- Изображения -->
+                    <div class="row mb-4">
+                        <div class="col-md-6">
+                            <div class="card">
+                                <div class="card-header">
+                                    <h5 class="mb-0">Исходное изображение</h5>
+                                </div>
+                                <div class="card-body image-container">
+                                    <img id="originalImage" src="" alt="Исходное">
+                                </div>
+                            </div>
+                        </div>
+                        <div class="col-md-6">
+                            <div class="card">
+                                <div class="card-header">
+                                    <h5 class="mb-0">Обработанное изображение</h5>
+                                </div>
+                                <div class="card-body image-container">
+                                    <img id="processedImage" src="" alt="Обработанное">
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <!-- Гистограммы -->
+                    <div class="row">
+                        <div class="col-md-6">
+                            <div class="card">
+                                <div class="card-header">
+                                    <h5 class="mb-0">Гистограмма исходного изображения</h5>
+                                </div>
+                                <div class="card-body">
+                                    <div class="chart-container">
+                                        <canvas id="originalChart"></canvas>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="col-md-6">
+                            <div class="card">
+                                <div class="card-header">
+                                    <h5 class="mb-0">Гистограмма обработанного изображения</h5>
+                                </div>
+                                <div class="card-body">
+                                    <div class="chart-container">
+                                        <canvas id="processedChart"></canvas>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="text-center mt-4">
+                    <a href="/" class="btn btn-primary btn-lg">
+                        <i class="fas fa-arrow-left"></i> Вернуться к форме обработки
+                    </a>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<!-- Подключаем Chart.js для графиков -->
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    console.log("Страница результатов загружена");
+    
+    // Проверяем, есть ли данные в sessionStorage
+    const resultData = sessionStorage.getItem('imageProcessingResult');
+    console.log("Данные из sessionStorage:", resultData);
+    
+    if (resultData) {
+        try {
+            const result = JSON.parse(resultData);
+            console.log("Парсинг успешен:", result);
+            
+            // Проверяем, есть ли URL изображений
+            if (!result.original_image_url || !result.processed_image_url) {
+                console.error("Нет URL изображений в данных");
+                showMessage('Ошибка: отсутствуют URL изображений', 'danger');
+                return;
+            }
+            
+            displayResults(result);
+            
+            // Очищаем sessionStorage после использования
+            sessionStorage.removeItem("imageProcessingResult");
+        } catch (e) {
+            console.error('Ошибка парсинга данных:', e);
+            showMessage('Ошибка загрузки данных результата', 'danger');
+        }
+    } else {
+        console.log("Нет данных в sessionStorage");
+        showMessage('Нет данных для отображения. Обработайте изображение на главной странице.', 'warning');
+    }
+});
+
+function displayResults(result) {
+    // 1. Показываем контейнер с результатами
+    document.getElementById('resultContainer').style.display = 'block';
+    
+    // 2. Отображаем изображения через URL
+    document.getElementById('originalImage').src = result.original_image_url;
+    document.getElementById('processedImage').src = result.processed_image_url;
+    
+    // 3. Создаём графики гистограмм
+    createHistogramChart('originalChart', result.histograms.original, 'Исходное изображение');
+    createHistogramChart('processedChart', result.histograms.processed, 'Обработанное изображение');
+    
+    // 4. Показываем информацию о параметрах обработки
+    showMessage(`Изображение обработано успешно! Параметры: ${result.processing_params.cross_type} крест, цвет: ${result.processing_params.color}`, 'success');
+}
+
+function createHistogramChart(canvasId, histogramData, title) {
+    const ctx = document.getElementById(canvasId).getContext('2d');
+    
+    // Создаём данные для графика
+    const labels = Array.from({length: 256}, (_, i) => i.toString());
+    
+    new Chart(ctx, {
+        type: 'line',
+        data: {
+            labels: labels,
+            datasets: [
+                {
+                    label: 'Красный канал',
+                    data: histogramData.red,
+                    borderColor: 'rgba(255, 99, 132, 1)',
+                    backgroundColor: 'rgba(255, 99, 132, 0.1)',
+                    tension: 0.4,
+                    fill: true
+                },
+                {
+                    label: 'Зелёный канал',
+                    data: histogramData.green,
+                    borderColor: 'rgba(75, 192, 192, 1)',
+                    backgroundColor: 'rgba(75, 192, 192, 0.1)',
+                    tension: 0.4,
+                    fill: true
+                },
+                {
+                    label: 'Синий канал',
+                    data: histogramData.blue,
+                    borderColor: 'rgba(54, 162, 235, 1)',
+                    backgroundColor: 'rgba(54, 162, 235, 0.1)',
+                    tension: 0.4,
+                    fill: true
+                }
+            ]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            plugins: {
+                title: {
+                    display: true,
+                    text: title
+                },
+                legend: {
+                    position: 'top',
+                }
+            },
+            scales: {
+                x: {
+                    title: {
+                        display: true,
+                        text: 'Интенсивность цвета (0-255)'
+                    }
+                },
+                y: {
+                    title: {
+                        display: true,
+                        text: 'Процент пикселей (%)'
+                    },
+                    beginAtZero: true
+                }
+            }
+        }
+    });
+}
+
+function showMessage(message, type = 'info') {
+    // Используем функцию из main.js
+    if (window.showToast) {
+        window.showToast(message, type);
+    } else {
+        alert(message);
+    }
+}
+</script>
+{% endblock %}

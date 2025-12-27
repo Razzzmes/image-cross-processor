@@ -1,0 +1,303 @@
+{% extends "base.html" %} {% block title %}Главная - Image Cross Processor{%
+endblock %} {% block content %}
+<div class="row">
+  <div class="col-lg-8 mx-auto">
+    <div class="card shadow">
+      <div class="card-body">
+        <form
+          id="imageForm"
+          enctype="multipart/form-data"
+          class="needs-validation"
+          novalidate
+        >
+          <fieldset>
+            <!-- Загрузка файла -->
+            <div class="mb-4">
+              <label for="imageFile" class="form-label fw-bold">
+                <i class="fas fa-image"></i> Выберите изображение *
+              </label>
+              <input
+                class="form-control"
+                type="file"
+                id="imageFile"
+                name="file"
+                accept=".jpg,.jpeg,.png,.gif,.bmp"
+                required
+              />
+              <div class="form-text">
+                Максимальный размер: 5MB. Форматы: JPG, PNG, GIF, BMP
+              </div>
+            </div>
+
+            <div class="row">
+              <!-- Тип креста -->
+              <div class="col-md-6 mb-3">
+                <label for="crossType" class="form-label fw-bold">
+                  <i class="fas fa-plus"></i> Тип креста *
+                </label>
+                <select
+                  class="form-select"
+                  id="crossType"
+                  name="cross_type"
+                  required
+                >
+                  <option value="" selected disabled>Выберите тип...</option>
+                  <option value="horizontal">Горизонтальный</option>
+                  <option value="vertical">Вертикальный</option>
+                  <option value="both">Оба креста</option>
+                </select>
+              </div>
+
+              <!-- Цвет креста -->
+              <div class="col-md-6 mb-3">
+                <label for="crossColor" class="form-label fw-bold">
+                  <i class="fas fa-palette"></i> Цвет креста *
+                </label>
+                <input
+                  type="color"
+                  class="form-control form-control-color"
+                  id="crossColor"
+                  name="color"
+                  value="#ff0000"
+                />
+              </div>
+            </div>
+
+            <!-- Капча -->
+            <div class="mb-4 border-top pt-3">
+              <div class="row align-items-end">
+                <div class="col-md-6">
+                  <label for="captchaText" class="form-label fw-bold">
+                    <i class="fas fa-key"></i> Введите код с картинки *
+                  </label>
+                  <div class="input-group">
+                    <input
+                      type="text"
+                      class="form-control"
+                      id="captchaText"
+                      name="captcha_text"
+                      placeholder="Введите 5 символов"
+                      maxlength="5"
+                      required
+                    />
+                    <button
+                      type="button"
+                      class="btn btn-outline-secondary"
+                      id="refreshCaptcha"
+                      title="Обновить капчу"
+                    >
+                      <i class="fas fa-redo"></i>
+                    </button>
+                  </div>
+                  <div class="form-text">
+                    Введите символы с картинки. Регистр не имеет значения.
+                  </div>
+                </div>
+                <div class="col-md-6">
+                  <div class="text-center">
+                    <div class="mb-2">
+                      <img
+                        id="captchaImage"
+                        src=""
+                        alt="Капча"
+                        class="img-thumbnail"
+                        style="cursor: pointer; height: 60px"
+                        title="Кликните для обновления"
+                      />
+                    </div>
+                    <small class="text-muted"
+                      >Кликните на картинку для обновления</small
+                    >
+                  </div>
+                </div>
+              </div>
+              <!-- Скрытое поле для ID капчи -->
+              <input type="hidden" id="captchaId" name="captcha_id" value="" />
+            </div>
+
+            <!-- Кнопки -->
+            <div class="d-grid gap-2 d-md-flex justify-content-md-end mt-4">
+              <button type="reset" class="btn btn-outline-secondary me-md-2">
+                <i class="fas fa-undo"></i> Очистить форму
+              </button>
+              <button type="submit" class="btn btn-primary" id="submitBtn">
+                <i class="fas fa-play-circle"></i> Обработать изображение
+              </button>
+            </div>
+          </fieldset>
+        </form>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %} {% block extra_js %}
+<script>
+  document.addEventListener("DOMContentLoaded", function () {
+    const form = document.getElementById("imageForm");
+    const captchaImage = document.getElementById("captchaImage");
+    const refreshButton = document.getElementById("refreshCaptcha");
+    const captchaIdInput = document.getElementById("captchaId");
+    const captchaTextInput = document.getElementById("captchaText");
+
+    // Функция загрузки новой капчи
+    async function loadNewCaptcha() {
+      try {
+        const response = await fetch("/api/captcha/generate");
+        const data = await response.json();
+
+        if (response.ok && data.success) {
+          // Устанавливаем изображение капчи
+          captchaImage.src = data.image;
+          // Сохраняем ID капчи в скрытое поле
+          captchaIdInput.value = data.captcha_id;
+          // Очищаем поле ввода
+          captchaTextInput.value = "";
+          captchaTextInput.focus();
+
+          console.log("Капча загружена, ID:", data.captcha_id);
+        } else {
+          throw new Error(data.error || "Не удалось загрузить капчу");
+        }
+      } catch (error) {
+        console.error("Ошибка загрузки капчи:", error);
+        showToast(
+          "❌ Не удалось загрузить капчу. Попробуйте обновить страницу.",
+          "danger"
+        );
+      }
+    }
+
+    // Загружаем первую капчу при загрузке страницы
+    loadNewCaptcha();
+
+    // Обновление капчи по клику на картинку
+    captchaImage.addEventListener("click", loadNewCaptcha);
+
+    // Обновление капчи по клику на кнопку
+    refreshButton.addEventListener("click", loadNewCaptcha);
+
+    // Обработка отправки формы
+    form.addEventListener("submit", async function (e) {
+      e.preventDefault();
+
+      // Проверяем, что капча загружена
+      if (!captchaIdInput.value) {
+        showToast("❌ Сначала загрузите капчу", "danger");
+        loadNewCaptcha();
+        return;
+      }
+
+      // Проверяем, что введен текст капчи
+      if (!captchaTextInput.value.trim()) {
+        showToast("❌ Введите код с картинки", "danger");
+        captchaTextInput.focus();
+        return;
+      }
+
+      const submitBtn = document.getElementById("submitBtn");
+      const originalText = submitBtn.innerHTML;
+      submitBtn.innerHTML =
+        '<i class="fas fa-spinner fa-spin"></i> Проверка капчи...';
+      submitBtn.disabled = true;
+
+      try {
+        // НЕ проверяем капчу отдельно - проверка будет в /api/process
+        const formData = new FormData(this);
+
+        const response = await fetch("/api/process", {
+          method: "POST",
+          body: formData,
+        });
+
+        const result = await response.json();
+
+        if (response.ok) {
+          // Используем уже созданный объект
+          const resultToSave = {
+            success: true,
+            message: result.message,
+            original_filename: result.original_filename,
+            original_size: result.original_size,
+            processed_size: result.processed_size,
+            processing_params: result.processing_params,
+            histograms: result.histograms,
+            original_image_url: result.original_image, // Это base64 строка
+            processed_image_url: result.processed_image, // Это base64 строка
+          };
+
+          console.log("Данные для сохранения:", resultToSave);
+
+          // Сохраняем в sessionStorage
+          try {
+            // Проверяем, что данные изображений есть
+            if (
+              !resultToSave.original_image_url ||
+              !resultToSave.processed_image_url
+            ) {
+              throw new Error("Нет данных изображений в ответе от сервера");
+            }
+
+            sessionStorage.setItem(
+              "imageProcessingResult",
+              JSON.stringify(resultToSave)
+            );
+            console.log("Данные сохранены в sessionStorage");
+
+            // Переходим на страницу результатов
+            window.location.href = "/result";
+          } catch (storageError) {
+            console.error("Ошибка сохранения в sessionStorage:", storageError);
+            showToast(
+              "❌ Ошибка сохранения данных. Попробуйте снова.",
+              "danger"
+            );
+            loadNewCaptcha();
+          }
+        } else {
+          // Обработка ошибки от сервера
+          throw new Error(result.error || "Ошибка обработки изображения");
+        }
+      } catch (error) {
+        console.error("Ошибка при отправке формы:", error);
+        showToast("❌ Ошибка: " + error.message, "danger");
+        // При ошибке загружаем новую капчу
+        loadNewCaptcha();
+      } finally {
+        submitBtn.innerHTML = originalText;
+        submitBtn.disabled = false;
+      }
+    });
+  });
+
+  function showToast(message, type = "info") {
+    const toastContainer = document.getElementById("toast-container");
+    if (!toastContainer) {
+      console.error("Toast container not found");
+      return;
+    }
+
+    const toastId = "toast-" + Date.now();
+
+    const toastHTML = `
+        <div id="${toastId}" class="toast" role="alert">
+            <div class="toast-header bg-${type} text-white">
+                <strong class="me-auto">${
+                  type === "danger" ? "Ошибка" : "Успех"
+                }</strong>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="toast"></button>
+            </div>
+            <div class="toast-body">${message}</div>
+        </div>
+    `;
+
+    toastContainer.insertAdjacentHTML("beforeend", toastHTML);
+    const toastElement = document.getElementById(toastId);
+    const toast = new bootstrap.Toast(toastElement, { delay: 5000 });
+    toast.show();
+
+    toastElement.addEventListener("hidden.bs.toast", function () {
+      this.remove();
+    });
+  }
+</script>
+{% endblock %}
